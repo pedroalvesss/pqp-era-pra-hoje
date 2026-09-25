@@ -7,6 +7,7 @@ import {
   DEPTS,
   type Company,
   type DayChoice,
+  type DueDay,
   type Dept,
   type Prio,
 } from "@/lib/constants";
@@ -16,6 +17,7 @@ import { OptionalChips, ProjectChips } from "@/components/DemandChips";
 import { FormGroup, FormRow, rowInputClass } from "@/components/FormGroup";
 import { PrioPicker } from "@/components/PrioPicker";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { DatePickerChip } from "./DatePickerChip";
 import { useNewDemandForm } from "./useNewDemandForm";
 
 export interface NewDemandDialogProps {
@@ -33,6 +35,10 @@ export default function NewDemandDialog({ projects, workdayEnd, onClose }: NewDe
   }
   function handleSelectDay(day: DayChoice) {
     pick("day", day);
+  }
+  function handleSelectDate(date: string) {
+    pick("date", date);
+    pick("day", "data");
   }
   function handleChangePrio(p: Prio) {
     pick("prio", p);
@@ -67,7 +73,12 @@ export default function NewDemandDialog({ projects, workdayEnd, onClose }: NewDe
             />
             <FormGroup>
               <FormRow label="quando">
-                <DayChips value={values.day} onSelect={handleSelectDay} />
+                <DayChips
+                  value={values.day}
+                  date={values.date}
+                  onSelect={handleSelectDay}
+                  onSelectDate={handleSelectDate}
+                />
               </FormRow>
               <FormRow label="hora" htmlFor="nd-time">
                 <input id="nd-time" type="time" className={rowInputClass} {...register("time")} />
@@ -118,16 +129,19 @@ export default function NewDemandDialog({ projects, workdayEnd, onClose }: NewDe
 }
 
 interface DayChipsProps {
-  value: DayChoice;
+  value: DueDay;
+  date: string | null;
   onSelect: (value: DayChoice) => void;
+  onSelectDate: (date: string) => void;
 }
 
-function DayChips({ value, onSelect }: DayChipsProps) {
+function DayChips({ value, date, onSelect, onSelectDate }: DayChipsProps) {
   return (
     <ChipScroller label="quando">
       {DAY_CHOICES.map((d) => (
         <DayChip key={d} day={d} active={value === d} onSelect={onSelect} />
       ))}
+      <DatePickerChip value={date} active={value === "data"} onSelect={onSelectDate} />
     </ChipScroller>
   );
 }

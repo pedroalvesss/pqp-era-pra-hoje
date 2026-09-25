@@ -189,6 +189,35 @@
   }
 }
 
+/* Barra de rolagem fina e discreta: pílula neutral-800 sem trilho. */
+@layer base {
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  /* a borda transparente com background-clip afina a pílula sem encolher a área de clique */
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-neutral-800);
+    background-clip: padding-box;
+    border: 3px solid transparent;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-neutral-700);
+  }
+  /* Firefox não tem os pseudo-elementos; no Chrome as propriedades padrão anulariam os de cima */
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--color-neutral-800) transparent;
+    }
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

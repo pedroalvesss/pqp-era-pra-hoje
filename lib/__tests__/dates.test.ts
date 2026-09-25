@@ -43,6 +43,9 @@ describe("dueFrom", () => {
   it("semana que vem é a próxima segunda", () => {
     expect(isoDate(dueFrom("semana", "18:00", NOW, TZ), TZ)).toBe("2026-09-28");
   });
+  it("dia escolhido no calendário, no fuso do usuário", () => {
+    expect(dueFrom("data", "09:00", NOW, TZ, "2026-10-15")).toBe(Date.UTC(2026, 9, 15, 12, 0));
+  });
 });
 
 describe("dayDiff e dayName", () => {

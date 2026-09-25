@@ -36,7 +36,9 @@ describe("HomeView", () => {
     renderWithApp(<HomeView demands={[]} projects={projects} userName="Pedro" workdayEnd="18:00" />);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("relaxa, hoje tá tranquilo.");
     expect(screen.queryByRole("region", { name: "já era" })).not.toBeInTheDocument();
-    expect(screen.getAllByText("relaxa, hoje tá tranquilo.")).toHaveLength(2);
+    // o título já diz "relaxa"; a seção não repete
+    expect(screen.getAllByText("relaxa, hoje tá tranquilo.")).toHaveLength(1);
+    expect(screen.getByText("nada vence hoje.")).toBeInTheDocument();
   });
 });
 

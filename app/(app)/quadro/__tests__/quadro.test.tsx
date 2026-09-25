@@ -5,12 +5,22 @@ import { demand, projects, renderWithApp } from "@/test/fixtures";
 
 vi.mock("next/link", async () => (await import("@/test/nextMocks")).linkMock);
 const updateDemand = vi.hoisted(() => vi.fn(async () => ({ ok: true })));
+const openNewDemand = vi.hoisted(() => vi.fn());
+vi.mock("@/contexts/NewDemandContext", () => ({ useNewDemand: () => ({ openNewDemand }) }));
 vi.mock("@/actions/demandActions", () => ({ updateDemand, deleteDemand: vi.fn(), restoreDemand: vi.fn() }));
 
 import { KanbanBoard } from "../_components/KanbanBoard";
 
 describe("KanbanBoard", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("sem nenhuma demanda, mostra o vazio centralizado com atalho pra criar", async () => {
+    renderWithApp(<KanbanBoard demands={[]} projects={projects} />);
+    expect(screen.queryByRole("region", { name: "a fazer" })).not.toBeInTheDocument();
+    expect(screen.getByText(/quadro vazio/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "+ nova demanda" }));
+    expect(openNewDemand).toHaveBeenCalled();
+  });
 
   it("4 colunas com contadores", () => {
     renderWithApp(

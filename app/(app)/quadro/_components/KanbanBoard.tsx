@@ -4,6 +4,7 @@ import { useOptimistic, useTransition } from "react";
 import type { Status } from "@/lib/constants";
 import { nextStatus, sortDemands, type DemandDTO, type ProjectDTO } from "@/lib/demand";
 import { useDemandActions } from "@/hooks/useDemandActions";
+import { EmptyBoard } from "./EmptyBoard";
 import { KanbanColumn } from "./KanbanColumn";
 
 const COLUMNS: { status: Status; label: string; className: string }[] = [
@@ -50,8 +51,10 @@ export function KanbanBoard({ demands, projects }: KanbanBoardProps) {
     move(d, nextStatus(d.status));
   }
 
+  if (board.length === 0) return <EmptyBoard />;
+
   return (
-    <div className="-mx-1 -mt-2 flex snap-x snap-mandatory items-start gap-4 overflow-x-auto px-1 pb-2">
+    <div className="-mx-1 -mt-2 flex snap-x snap-mandatory items-start gap-4 overflow-x-auto px-1 pb-3">
       {COLUMNS.map((c) => (
         <KanbanColumn
           key={c.status}

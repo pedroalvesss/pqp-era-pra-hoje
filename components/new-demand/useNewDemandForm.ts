@@ -11,6 +11,7 @@ export function blankForm(workdayEnd: string, projects: ProjectDTO[]): CreateDem
   return {
     title: "",
     day: "hoje",
+    date: null,
     time: workdayEnd,
     prio: "media",
     requester: "",
@@ -40,7 +41,8 @@ export function useNewDemandForm(workdayEnd: string, projects: ProjectDTO[], onD
     toast("anotado. agora não tem desculpa.", () => void deleteDemand(result.id));
   });
 
-  const error = form.formState.errors.title?.message ?? form.formState.errors.root?.message ?? "";
+  const { errors } = form.formState;
+  const error = errors.title?.message ?? errors.date?.message ?? errors.root?.message ?? "";
 
   return { form, values: values as CreateDemandInput, pick, submit, error };
 }

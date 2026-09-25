@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { NOW, demand, projects } from "@/test/fixtures";
 
 vi.mock("next/navigation", async () => (await import("@/test/nextMocks")).navigationMock);
@@ -36,8 +37,20 @@ describe("listFilters", () => {
   });
 });
 
-it("ProjectSelect navega mantendo o status", () => {
-  render(<ProjectSelect projects={projects} status="todo" value={null} />);
-  fireEvent.change(screen.getByLabelText("projeto"), { target: { value: projects[1].id } });
-  expect(router.push).toHaveBeenCalledWith(`/demandas?status=todo&projeto=${projects[1].id}`);
+describe("ProjectSelect", () => {
+  it("mostra o projeto atual e navega mantendo o status", async () => {
+    render(<ProjectSelect projects={projects} status="todo" value={projects[0].id} />);
+    const trigger = screen.getByRole("combobox", { name: "projeto" });
+    expect(trigger).toHaveTextContent("marketing");
+    await userEvent.click(trigger);
+    await userEvent.click(await screen.findByRole("option", { name: "financeiro" }));
+    expect(router.push).toHaveBeenCalledWith(`/demandas?status=todo&projeto=${projects[1].id}`);
+  });
+
+  it("'todos os projetos' limpa o filtro", async () => {
+    render(<ProjectSelect projects={projects} status="all" value={projects[0].id} />);
+    await userEvent.click(screen.getByRole("combobox", { name: "projeto" }));
+    await userEvent.click(await screen.findByRole("option", { name: "todos os projetos" }));
+    expect(router.push).toHaveBeenLastCalledWith("/demandas");
+  });
 });

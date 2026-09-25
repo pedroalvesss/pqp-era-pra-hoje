@@ -15,6 +15,8 @@ export type Lead = (typeof LEADS)[number];
 
 export const DAY_CHOICES = ["hoje", "amanha", "sexta", "semana"] as const;
 export type DayChoice = (typeof DAY_CHOICES)[number];
+/** "data" = dia escolhido no calendário. */
+export type DueDay = DayChoice | "data";
 
 export const STATUS_LABEL: Record<Status, string> = {
   todo: "a fazer",

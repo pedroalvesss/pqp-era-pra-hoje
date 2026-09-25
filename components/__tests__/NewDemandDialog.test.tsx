@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { projects, renderWithApp } from "@/test/fixtures";
 
@@ -31,6 +31,7 @@ describe("NewDemandDialog", () => {
     expect(createDemand).toHaveBeenCalledWith({
       title: "Enviar proposta",
       day: "amanha",
+      date: null,
       time: "17:30",
       prio: "urgente",
       requester: "Carla",
@@ -43,6 +44,21 @@ describe("NewDemandDialog", () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await user.click(await screen.findByRole("button", { name: "desfazer" }));
     expect(deleteDemand).toHaveBeenCalledWith("novo");
+  });
+
+  it("outro dia: escolhe no calendário e o chip mostra a data", async () => {
+    // só o Date é falso: 24/09/2026. Os timers seguem reais pro user-event
+    vi.useFakeTimers({ now: new Date(2026, 8, 24, 14), toFake: ["Date"] });
+    renderWithApp(<NewDemandDialog projects={projects} workdayEnd="18:00" onClose={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "escolher dia no calendário" }));
+    const grid = await screen.findByRole("grid");
+    expect(within(grid).getByRole("button", { name: /23 de setembro/ })).toBeDisabled();
+    await userEvent.click(within(grid).getByRole("button", { name: /30 de setembro/ }));
+    expect(screen.getByRole("button", { name: "dia escolhido: qua, 30/09" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "amanhã" })).toHaveAttribute("aria-pressed", "false");
+    await userEvent.type(screen.getByPlaceholderText("o que pediram?"), "Reunião{Enter}");
+    expect(createDemand).toHaveBeenCalledWith(expect.objectContaining({ day: "data", date: "2026-09-30" }));
+    vi.useRealTimers();
   });
 
   it("cancelar fecha", async () => {

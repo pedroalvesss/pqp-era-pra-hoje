@@ -1,4 +1,4 @@
-import type { DayChoice } from "./constants";
+import type { DueDay } from "./constants";
 
 interface ZonedParts {
   year: number;
@@ -94,13 +94,17 @@ export function parseHm(time: string) {
   return { hour: h || 0, minute: m || 0 };
 }
 
-export function dueFrom(day: DayChoice, time: string, now: number, tz: string) {
+export function dueFrom(day: DueDay, time: string, now: number, tz: string, date?: string | null) {
+  const { hour, minute } = parseHm(time);
+  if (day === "data" && date) {
+    const [y, m, d] = date.split("-").map(Number);
+    return zonedTime(y, m, d, hour, minute, tz);
+  }
   const p = zonedParts(now, tz);
   let add = 0;
   if (day === "amanha") add = 1;
   if (day === "sexta") add = (5 - p.weekday + 7) % 7 || 7;
   if (day === "semana") add = (1 - p.weekday + 7) % 7 || 7;
-  const { hour, minute } = parseHm(time);
   return zonedTime(p.year, p.month, p.day + add, hour, minute, tz);
 }
 

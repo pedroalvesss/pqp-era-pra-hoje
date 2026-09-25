@@ -36,6 +36,7 @@ describe("demanda", () => {
   const valid = {
     title: "Enviar proposta",
     day: "hoje",
+    date: null,
     time: "18:00",
     prio: "alta",
     requester: "",
@@ -50,6 +51,11 @@ describe("demanda", () => {
     expect(createDemandSchema.safeParse({ ...valid, company: "Acme" }).success).toBe(false));
   it("rejeita hora inválida", () =>
     expect(createDemandSchema.safeParse({ ...valid, time: "25:00" }).success).toBe(false));
+  it("dia do calendário exige a data", () => {
+    expect(errorOf(createDemandSchema.safeParse({ ...valid, day: "data" }))).toBe("escolhe o dia no calendário.");
+    expect(createDemandSchema.safeParse({ ...valid, day: "data", date: "2026-10-15" }).success).toBe(true);
+    expect(createDemandSchema.safeParse({ ...valid, day: "data", date: "15/10/2026" }).success).toBe(false);
+  });
   it("update parcial", () => {
     expect(updateDemandSchema.safeParse({ status: "done" }).success).toBe(true);
     expect(updateDemandSchema.safeParse({ status: "arquivada" }).success).toBe(false);

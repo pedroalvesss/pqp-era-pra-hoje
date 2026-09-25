@@ -24,11 +24,11 @@ export type CreateResult = { ok: true; id: string } | { ok: false; error: string
 export async function createDemand(input: CreateDemandInput): Promise<CreateResult> {
   const parsed = createDemandSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
-  const { day, time, ...rest } = parsed.data;
+  const { day, date, time, ...rest } = parsed.data;
   const profile = await getProfile();
   let id = "";
   const result = await mutate(async () => {
-    id = await postDemand({ ...rest, due: dueFrom(day, time, Date.now(), profile.timezone) });
+    id = await postDemand({ ...rest, due: dueFrom(day, time, Date.now(), profile.timezone, date) });
   });
   return result.ok ? { ok: true, id } : result;
 }
@@ -41,6 +41,7 @@ export async function quickCreateDemand(title: string): Promise<CreateResult> {
   return createDemand({
     title: parsed.data.title,
     day: "hoje",
+    date: null,
     time: profile.workdayEnd,
     prio: "media",
     requester: "",

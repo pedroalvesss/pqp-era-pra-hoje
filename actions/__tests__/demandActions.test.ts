@@ -17,6 +17,7 @@ import { createDemand, deleteDemand, quickCreateDemand, updateDemand } from "../
 const form = {
   title: "Enviar proposta",
   day: "hoje" as const,
+  date: null,
   time: "18:00",
   prio: "media" as const,
   requester: "",

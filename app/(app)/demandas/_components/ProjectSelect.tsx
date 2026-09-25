@@ -1,8 +1,8 @@
 "use client";
 
-import type { ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { ProjectDTO } from "@/lib/demand";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { filterHref, type StatusFilter } from "./listFilters";
 
 interface ProjectSelectProps {
@@ -11,26 +11,32 @@ interface ProjectSelectProps {
   value: string | null;
 }
 
+// o Radix Select não aceita value vazio, então "todos" vira "all"
+const ALL = "all";
+
 export function ProjectSelect({ projects, status, value }: ProjectSelectProps) {
   const router = useRouter();
 
-  function handleChangeProjectSelect(e: ChangeEvent<HTMLSelectElement>) {
-    router.push(filterHref(status, e.target.value === "all" ? null : e.target.value));
+  function handleChangeProjectSelect(next: string) {
+    router.push(filterHref(status, next === ALL ? null : next));
   }
 
   return (
-    <select
-      aria-label="projeto"
-      value={value ?? "all"}
-      onChange={handleChangeProjectSelect}
-      className="border-divider ml-auto min-h-[34px] rounded-[10px] border bg-transparent px-2.5 text-sm text-neutral-300"
-    >
-      <option value="all">todos os projetos</option>
-      {projects.map((p) => (
-        <option key={p.id} value={p.id}>
-          {p.name.toLowerCase()}
-        </option>
-      ))}
-    </select>
+    <Select value={value ?? ALL} onValueChange={handleChangeProjectSelect}>
+      <SelectTrigger aria-label="projeto" className="ml-auto">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={ALL}>todos os projetos</SelectItem>
+        {projects.map((p) => (
+          <SelectItem key={p.id} value={p.id}>
+            <span className="inline-flex items-center gap-2">
+              <span aria-hidden="true" className="size-2 rounded-full" style={{ background: p.color }} />
+              {p.name.toLowerCase()}
+            </span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

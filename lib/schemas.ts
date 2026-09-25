@@ -37,23 +37,28 @@ export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
 const optionalProject = z.uuid().nullable();
 
-export const createDemandSchema = z.object({
-  title: z.string().trim().min(1, "escreve pelo menos o que é, né.").max(300),
-  day: z.enum(DAY_CHOICES),
-  time,
-  prio: z.enum(PRIOS),
-  requester: z.string().trim().max(80),
-  projectId: optionalProject,
-  company: z.enum(COMPANIES).nullable(),
-  dept: z.enum(DEPTS).nullable(),
-});
+const title = z.string().trim().min(1, "escreve pelo menos o que é, né.").max(300);
+
+export const createDemandSchema = z
+  .object({
+    title,
+    day: z.enum([...DAY_CHOICES, "data"]),
+    date: z.iso.date().nullable(),
+    time,
+    prio: z.enum(PRIOS),
+    requester: z.string().trim().max(80),
+    projectId: optionalProject,
+    company: z.enum(COMPANIES).nullable(),
+    dept: z.enum(DEPTS).nullable(),
+  })
+  .refine((v) => v.day !== "data" || !!v.date, { message: "escolhe o dia no calendário.", path: ["date"] });
 export type CreateDemandInput = z.infer<typeof createDemandSchema>;
 
-export const quickDemandSchema = z.object({ title: createDemandSchema.shape.title });
+export const quickDemandSchema = z.object({ title });
 
 export const updateDemandSchema = z
   .object({
-    title: createDemandSchema.shape.title,
+    title: title,
     due: z.number().int().positive(),
     prio: z.enum(PRIOS),
     requester: z.string().trim().max(80),
@@ -70,7 +75,7 @@ export const idSchema = z.uuid();
 
 export const demandSnapshotSchema = z.object({
   id: idSchema,
-  title: createDemandSchema.shape.title,
+  title: title,
   due: z.number().int().positive(),
   prio: z.enum(PRIOS),
   requester: z.string().max(80),

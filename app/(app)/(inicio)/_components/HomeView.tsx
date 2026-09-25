@@ -43,7 +43,7 @@ export function HomeView({ demands, projects, userName, workdayEnd }: HomeViewPr
         titleClassName="text-accent"
         demands={today}
         projects={projects}
-        empty={<p className="m-0 px-3 py-2 text-[15px] text-neutral-400">relaxa, hoje tá tranquilo.</p>}
+        empty={<p className="m-0 px-3 py-2 text-[15px] text-neutral-400">nada vence hoje.</p>}
       />
       {upcoming.length > 0 && <DemandSection title="depois" demands={upcoming} projects={projects} />}
     </>
