@@ -62,6 +62,10 @@ export const demands = pgTable(
     prevStatus: statusEnum("prev_status"),
     notes: text().notNull().default(""),
     notifiedAt: timestamp("notified_at", { withTimezone: true }),
+    lateNotifiedAt: timestamp("late_notified_at", { withTimezone: true }),
+    // quando entrou em "esperando"; zera ao sair, pra contagem recomeçar
+    waitingSince: timestamp("waiting_since", { withTimezone: true }),
+    waitingNotifiedAt: timestamp("waiting_notified_at", { withTimezone: true }),
     createdAt: createdAt(),
     doneAt: timestamp("done_at", { withTimezone: true }),
   },

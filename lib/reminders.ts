@@ -1,4 +1,5 @@
 import { LEAD_MINUTES, type Lead } from "./constants";
+import { zonedParts } from "./dates";
 
 export function reminderText(title: string, minutesLeft: number) {
   const m = Math.max(1, Math.round(minutesLeft));
@@ -10,4 +11,24 @@ export function reminderText(title: string, minutesLeft: number) {
 /** Já tá na hora de avisar? Ignora o que venceu há mais de 1h pra não mandar aviso velho. */
 export function shouldRemind(due: number, lead: Lead, now: number) {
   return due - LEAD_MINUTES[lead] * 60000 <= now && due > now - 3600000;
+}
+
+export function lateText(title: string, daysLate: number) {
+  const when = daysLate === 1 ? "era pra ontem" : `venceu há ${daysLate} dias`;
+  return `"${title}" ${when}. Ainda dá pra fingir que foi hoje.`;
+}
+
+export function waitingText(title: string, requester: string, days: number) {
+  const who = requester.trim();
+  return who
+    ? `Você tá esperando ${who} há ${days} dias em "${title}". Bora cutucar?`
+    : `"${title}" tá esperando alguém há ${days} dias. Bora cutucar?`;
+}
+
+export const WAITING_DAYS = 2;
+export const LATE_MAX_DAYS = 7;
+
+/** Cutucada (atraso, espera) só de manhã em diante, no fuso do usuário: ninguém quer push de madrugada. */
+export function isNudgeTime(now: number, tz: string) {
+  return zonedParts(now, tz).hour >= 9;
 }

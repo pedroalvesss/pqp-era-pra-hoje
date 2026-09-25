@@ -14,7 +14,7 @@ vi.mock("@/db", () => ({
 vi.mock("@/lib/env", () => ({ env: (n: string) => n }));
 vi.mock("web-push", () => ({ default: push }));
 
-import { sendDueReminders } from "../pushService/sendDueReminders";
+import { sendReminders } from "../pushService/sendReminders";
 
 let db: TestDb;
 let userId: string;
@@ -31,7 +31,7 @@ async function addDevice(endpoint = "https://push/1") {
   await db.insert(pushSubscriptions).values({ endpoint, userId, p256dh: "k", auth: "a" });
 }
 
-describe("sendDueReminders", () => {
+describe("sendReminders", () => {
   beforeAll(async () => {
     db = await createTestDb();
     ctx.db = db;
@@ -47,27 +47,27 @@ describe("sendDueReminders", () => {
     const id = await addDemand(50);
     await addDevice("https://push/1");
     await addDevice("https://push/2");
-    expect(await sendDueReminders(NOW)).toEqual({ sent: 2 });
+    expect(await sendReminders(NOW)).toMatchObject({ sent: 2 });
     expect(JSON.parse(push.sendNotification.mock.calls[0][1])).toMatchObject({ url: `/d/${id}` });
     const [n] = await db.select().from(notifications);
     expect(n.text).toContain("Faltam 50 min");
-    expect(await sendDueReminders(NOW)).toEqual({ sent: 0 });
+    expect(await sendReminders(NOW)).toMatchObject({ sent: 0 });
   });
 
   it("respeita a antecedência do usuário e ignora feitas", async () => {
     await addDemand(120);
     await addDemand(30, { status: "done" });
-    expect(await sendDueReminders(NOW)).toEqual({ sent: 0 });
+    expect(await sendReminders(NOW)).toMatchObject({ sent: 0 });
     await db.update(users).set({ lead: "1d" });
     await addDevice();
-    expect(await sendDueReminders(NOW)).toEqual({ sent: 1 });
+    expect(await sendReminders(NOW)).toMatchObject({ sent: 1 });
   });
 
   it("push desligado ainda gera o aviso no app", async () => {
     await db.update(users).set({ pushEnabled: false });
     await addDemand(10);
     await addDevice();
-    await sendDueReminders(NOW);
+    await sendReminders(NOW);
     expect(push.sendNotification).not.toHaveBeenCalled();
     expect(await db.select().from(notifications)).toHaveLength(1);
   });
@@ -76,7 +76,7 @@ describe("sendDueReminders", () => {
     push.sendNotification.mockRejectedValueOnce({ statusCode: 410 });
     await addDemand(10);
     await addDevice();
-    await sendDueReminders(NOW);
+    await sendReminders(NOW);
     expect(await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId))).toHaveLength(0);
   });
 });

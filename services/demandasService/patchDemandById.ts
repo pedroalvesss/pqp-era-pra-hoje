@@ -16,8 +16,8 @@ export async function patchDemandById(demandId: string, input: UpdateDemandInput
 
   const { due, status, ...fields } = input;
   const patch: DemandPatch = withoutUndefined(fields);
-  // prazo novo = aviso novo
-  if (due !== undefined) Object.assign(patch, { due: new Date(due), notifiedAt: null });
+  // prazo novo = avisos novos (antecedência e atraso)
+  if (due !== undefined) Object.assign(patch, { due: new Date(due), notifiedAt: null, lateNotifiedAt: null });
 
   if (status !== undefined) {
     const [current] = await db.select({ status: demands.status }).from(demands).where(own);
@@ -26,6 +26,11 @@ export async function patchDemandById(demandId: string, input: UpdateDemandInput
     if (status === "done" && current.status !== "done")
       Object.assign(patch, { prevStatus: current.status, doneAt: new Date() });
     if (status !== "done") patch.doneAt = null;
+    // a espera conta de quando entrou em "esperando"; sair zera
+    if (status === "waiting" && current.status !== "waiting") {
+      Object.assign(patch, { waitingSince: new Date(), waitingNotifiedAt: null });
+    }
+    if (status !== "waiting") patch.waitingSince = null;
   }
 
   if (Object.keys(patch).length) await db.update(demands).set(patch).where(own);

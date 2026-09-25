@@ -9,5 +9,6 @@ import { assertProjectOwner } from "./assertProjectOwner";
 export async function postDemandRestore(d: DemandDTO) {
   const { id: userId } = await getCurrentUser();
   await assertProjectOwner(userId, d.projectId);
-  await db.insert(demands).values({ ...d, userId, due: new Date(d.due) });
+  const waitingSince = d.status === "waiting" ? new Date() : null;
+  await db.insert(demands).values({ ...d, userId, due: new Date(d.due), waitingSince });
 }

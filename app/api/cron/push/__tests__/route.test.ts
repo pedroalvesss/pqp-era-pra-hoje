@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const sendDueReminders = vi.hoisted(() => vi.fn(async () => ({ sent: 3 })));
-vi.mock("@/services/pushService/sendDueReminders", () => ({ sendDueReminders }));
+const sendReminders = vi.hoisted(() => vi.fn(async () => ({ sent: 3 })));
+vi.mock("@/services/pushService/sendReminders", () => ({ sendReminders }));
 
 import { POST } from "../route";
 
@@ -20,7 +20,7 @@ describe("POST /api/cron/push", () => {
   it("segredo errado", async () => {
     vi.stubEnv("CRON_SECRET", "s3cr3t");
     expect((await call("Bearer nope")).status).toBe(401);
-    expect(sendDueReminders).not.toHaveBeenCalled();
+    expect(sendReminders).not.toHaveBeenCalled();
   });
 
   it("segredo certo roda os lembretes", async () => {
