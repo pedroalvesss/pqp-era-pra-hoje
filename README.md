@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# pqp, era pra hoje?
 
-## Getting Started
+O caderninho de demandas que não esquece. Anota rápido, mostra o que vence hoje e avisa antes do prazo. Funciona no PC e no celular (PWA com push).
 
-First, run the development server:
+**Stack:** Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · shadcn/ui (Radix) · Zod · Supabase (Auth + Postgres) · Web Push · Vitest + Testing Library · Vercel
+
+## Como funciona
+
+- **Zero trust no client.** O browser nunca fala com o Supabase. A sessão fica em cookie `httpOnly`. Leituras rodam em Server Components (`services/`, todos `server-only`) e só DTOs chegam ao client. Mutações são Server Actions (`actions/`) validadas com Zod.
+- **RLS em tudo.** Cada tabela só deixa o dono ler e escrever.
+- **Fuso horário.** "Hoje" é calculado no fuso do usuário (pego do aparelho no cadastro), não no fuso UTC do servidor.
+- **Push.** O `pg_cron` do Supabase chama `/api/cron/push` a cada 5 min. A rota procura demandas dentro da antecedência configurada, grava o aviso e manda Web Push para cada aparelho inscrito.
+- **Detalhe da demanda.** `/d/[id]` abre como drawer por cima da tela atual (rota interceptada) ou como página cheia quando acessado direto (link do push).
+
+## Rodando local
 
 ```bash
+npm install
+cp .env.example .env.local   # preencha as variáveis
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Supabase
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Crie um projeto e rode `supabase/migrations/0001_init.sql` no SQL Editor.
+2. Em **Authentication → URL Configuration**, adicione `http://localhost:3000/auth/confirm` e a URL de produção + `/auth/confirm` às Redirect URLs.
+3. Depois do primeiro deploy, rode `supabase/cron.sql` (troque `<APP_URL>` e `<CRON_SECRET>`).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Chaves VAPID
 
-## Learn More
+```bash
+npx web-push generate-vapid-keys
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Scripts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| comando             | o que faz                   |
+| ------------------- | --------------------------- |
+| `npm run dev`       | servidor de desenvolvimento |
+| `npm test`          | Vitest                      |
+| `npm run lint`      | ESLint                      |
+| `npm run typecheck` | TypeScript                  |
+| `npm run format`    | Prettier                    |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Hooks do Husky rodam lint-staged no pre-commit e commitlint (Conventional Commits) no commit-msg.
 
-## Deploy on Vercel
+## Estrutura
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+app/
+  (auth)/        entrar, criar-conta, redefinir-senha
+  (app)/         shell com sidebar/tab bar
+    (inicio)/    home com a folhinha do dia
+    demandas/ quadro/ projetos/ busca/ avisos/ perfil/ d/[id]/
+    @modal/      drawer da demanda (rota interceptada)
+  api/cron/push/
+actions/         Server Actions (mutações)
+services/        acesso ao Supabase, um arquivo por função
+components/      componentes usados em mais de uma rota
+contexts/ hooks/ lib/
+supabase/        migrations e cron
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Cada rota tem `_components`, `__tests__`, `loading.tsx` e `error.tsx`.
