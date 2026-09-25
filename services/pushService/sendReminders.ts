@@ -86,7 +86,6 @@ async function lateReminders(now: number): Promise<Reminder[]> {
         userId: d.userId,
         pushEnabled: d.pushEnabled,
         title: d.title,
-        title: d.title,
         body: lateText(d.title, daysLate),
         mark: { lateNotifiedAt: new Date(now) },
       },
