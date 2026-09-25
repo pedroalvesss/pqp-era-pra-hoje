@@ -32,3 +32,9 @@ export const LATE_MAX_DAYS = 7;
 export function isNudgeTime(now: number, tz: string) {
   return zonedParts(now, tz).hour >= 9;
 }
+
+/** No push o título já é a demanda: tira a menção repetida do texto. */
+export function pushBody(text: string, title: string) {
+  const q = `"${title}"`;
+  return text.replace(` pra ${q}`, "").replace(` em ${q}`, "").replace(`${q} `, "");
+}

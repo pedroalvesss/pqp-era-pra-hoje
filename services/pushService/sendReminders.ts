@@ -10,6 +10,7 @@ import {
   WAITING_DAYS,
   isNudgeTime,
   lateText,
+  pushBody,
   reminderText,
   shouldRemind,
   waitingText,
@@ -21,6 +22,7 @@ interface Reminder {
   demandId: string;
   userId: string;
   pushEnabled: boolean;
+  title: string;
   body: string;
   /** Coluna que marca "já avisei", pra não repetir. */
   mark: Partial<typeof demands.$inferInsert>;
@@ -55,6 +57,7 @@ async function dueReminders(now: number): Promise<Reminder[]> {
       demandId: d.id,
       userId: d.userId,
       pushEnabled: d.pushEnabled,
+      title: d.title,
       body: reminderText(d.title, (d.due.getTime() - now) / 60000),
       mark: { notifiedAt: new Date(now) },
     }));
@@ -82,6 +85,8 @@ async function lateReminders(now: number): Promise<Reminder[]> {
         demandId: d.id,
         userId: d.userId,
         pushEnabled: d.pushEnabled,
+        title: d.title,
+        title: d.title,
         body: lateText(d.title, daysLate),
         mark: { lateNotifiedAt: new Date(now) },
       },
@@ -108,6 +113,7 @@ async function waitingReminders(now: number): Promise<Reminder[]> {
       demandId: d.id,
       userId: d.userId,
       pushEnabled: d.pushEnabled,
+      title: d.title,
       body: waitingText(d.title, d.requester, Math.floor((now - d.waitingSince!.getTime()) / DAY_MS)),
       mark: { waitingNotifiedAt: new Date(now) },
     }));
@@ -132,7 +138,7 @@ export async function sendReminders(now = Date.now()) {
     await db.insert(notifications).values({ userId: r.userId, demandId: r.demandId, text: r.body });
     if (!r.pushEnabled) continue;
 
-    const payload = JSON.stringify({ title: "pqp, era pra hoje?", body: r.body, url: `/d/${r.demandId}` });
+    const payload = JSON.stringify({ title: r.title, body: pushBody(r.body, r.title), url: `/d/${r.demandId}` });
     for (const s of subs.filter((x) => x.userId === r.userId)) {
       try {
         await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload);
