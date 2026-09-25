@@ -1,13 +1,13 @@
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { users } from "@/db/schema";
 import type { PrefsInput } from "@/lib/schemas";
 import { withoutUndefined } from "@/lib/utils";
 import { getCurrentUser } from "../authService/getCurrentUser";
 
 export async function patchProfile(input: PrefsInput) {
-  const user = await getCurrentUser();
-  const supabase = await createClient();
-  const patch = withoutUndefined({ push_enabled: input.pushEnabled, lead: input.lead, workday_end: input.workdayEnd });
-  const { error } = await supabase.from("profiles").update(patch).eq("id", user.id);
-  if (error) throw error;
+  const { id } = await getCurrentUser();
+  const patch = withoutUndefined({ pushEnabled: input.pushEnabled, lead: input.lead, workdayEnd: input.workdayEnd });
+  if (Object.keys(patch).length) await db.update(users).set(patch).where(eq(users.id, id));
 }

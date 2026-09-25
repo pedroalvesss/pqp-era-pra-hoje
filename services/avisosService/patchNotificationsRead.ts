@@ -1,11 +1,20 @@
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
+import { and, eq, isNull } from "drizzle-orm";
+import { db } from "@/db";
+import { notifications } from "@/db/schema";
+import { getCurrentUser } from "../authService/getCurrentUser";
 
 /** Sem id, marca todas. */
-export async function patchNotificationsRead(id?: string) {
-  const supabase = await createClient();
-  let query = supabase.from("notifications").update({ read_at: new Date().toISOString() }).is("read_at", null);
-  if (id) query = query.eq("id", id);
-  const { error } = await query;
-  if (error) throw error;
+export async function patchNotificationsRead(notificationId?: string) {
+  const { id } = await getCurrentUser();
+  await db
+    .update(notifications)
+    .set({ readAt: new Date() })
+    .where(
+      and(
+        eq(notifications.userId, id),
+        isNull(notifications.readAt),
+        notificationId ? eq(notifications.id, notificationId) : undefined,
+      ),
+    );
 }

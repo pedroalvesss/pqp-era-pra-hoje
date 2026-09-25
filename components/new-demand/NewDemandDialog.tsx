@@ -1,6 +1,5 @@
 "use client";
 
-import type { ChangeEvent, FormEvent, KeyboardEvent } from "react";
 import {
   COMPANIES,
   DAY_CHOICES,
@@ -26,38 +25,26 @@ export interface NewDemandDialogProps {
 }
 
 export default function NewDemandDialog({ projects, workdayEnd, onClose }: NewDemandDialogProps) {
-  const { form, set, error, pending, submit } = useNewDemandForm(workdayEnd, projects, onClose);
+  const { form, values, pick, submit, error } = useNewDemandForm(workdayEnd, projects, onClose);
+  const { register, formState } = form;
 
   function handleOpenChangeDialog(open: boolean) {
     if (!open) onClose();
   }
-  function handleSubmitForm(e: FormEvent) {
-    e.preventDefault();
-    submit();
-  }
-  function handleKeyDownTitleInput(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") handleSubmitForm(e);
-  }
-  function handleChangeTitleInput(e: ChangeEvent<HTMLInputElement>) {
-    set("title", e.target.value);
-  }
-  function handleChangeTimeInput(e: ChangeEvent<HTMLInputElement>) {
-    if (e.target.value) set("time", e.target.value);
-  }
-  function handleChangeRequesterInput(e: ChangeEvent<HTMLInputElement>) {
-    set("requester", e.target.value);
+  function handleSelectDay(day: DayChoice) {
+    pick("day", day);
   }
   function handleChangePrio(p: Prio) {
-    set("prio", p);
+    pick("prio", p);
   }
   function handleChangeProject(id: string | null) {
-    set("projectId", id);
+    pick("projectId", id);
   }
   function handleChangeCompany(c: Company | null) {
-    set("company", c);
+    pick("company", c);
   }
   function handleChangeDept(d: Dept | null) {
-    set("dept", d);
+    pick("dept", d);
   }
 
   return (
@@ -68,55 +55,42 @@ export default function NewDemandDialog({ projects, workdayEnd, onClose }: NewDe
           <span className="bg-surface size-1.5 rounded-full" />
           <span className="bg-surface size-1.5 rounded-full" />
         </div>
-        <form onSubmit={handleSubmitForm} className="flex min-h-0 flex-1 flex-col">
-          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-4 pt-5 pb-2">
+        {/* Enter no título envia o form */}
+        <form noValidate onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-4 pt-5 pb-2 [&>*]:shrink-0">
             <input
               autoFocus
               aria-label="o que pediram?"
-              value={form.title}
-              onChange={handleChangeTitleInput}
-              onKeyDown={handleKeyDownTitleInput}
               placeholder="o que pediram?"
               className="text-text min-w-0 border-none bg-transparent px-1 text-[26px] font-medium tracking-[-0.03em] outline-none"
+              {...register("title")}
             />
             <FormGroup>
               <FormRow label="quando">
-                <DayChips value={form.day} onChange={set} />
+                <DayChips value={values.day} onSelect={handleSelectDay} />
               </FormRow>
               <FormRow label="hora" htmlFor="nd-time">
-                <input
-                  id="nd-time"
-                  type="time"
-                  value={form.time}
-                  onChange={handleChangeTimeInput}
-                  className={rowInputClass}
-                />
+                <input id="nd-time" type="time" className={rowInputClass} {...register("time")} />
               </FormRow>
               <FormRow label="urgência">
-                <PrioPicker value={form.prio} onChange={handleChangePrio} />
+                <PrioPicker value={values.prio} onChange={handleChangePrio} />
               </FormRow>
               <FormRow label="quem pediu" htmlFor="nd-req">
-                <input
-                  id="nd-req"
-                  value={form.requester}
-                  onChange={handleChangeRequesterInput}
-                  placeholder="ninguém?"
-                  className={rowInputClass}
-                />
+                <input id="nd-req" placeholder="ninguém?" className={rowInputClass} {...register("requester")} />
               </FormRow>
               <FormRow label="projeto">
-                <ProjectChips projects={projects} value={form.projectId} onChange={handleChangeProject} />
+                <ProjectChips projects={projects} value={values.projectId} onChange={handleChangeProject} />
               </FormRow>
               <FormRow label="empresa">
                 <OptionalChips
                   label="empresa"
                   options={COMPANIES}
-                  value={form.company}
+                  value={values.company}
                   onChange={handleChangeCompany}
                 />
               </FormRow>
               <FormRow label="departamento">
-                <OptionalChips label="departamento" options={DEPTS} value={form.dept} onChange={handleChangeDept} />
+                <OptionalChips label="departamento" options={DEPTS} value={values.dept} onChange={handleChangeDept} />
               </FormRow>
             </FormGroup>
             {error && (
@@ -129,7 +103,11 @@ export default function NewDemandDialog({ projects, workdayEnd, onClose }: NewDe
             <button type="button" onClick={onClose} className="btn btn-secondary min-h-[46px] flex-1 rounded-xl">
               cancelar
             </button>
-            <button type="submit" disabled={pending} className="btn btn-primary min-h-[46px] flex-[2] rounded-xl">
+            <button
+              type="submit"
+              disabled={formState.isSubmitting}
+              className="btn btn-primary min-h-[46px] flex-[2] rounded-xl"
+            >
               anotar
             </button>
           </div>
@@ -141,14 +119,14 @@ export default function NewDemandDialog({ projects, workdayEnd, onClose }: NewDe
 
 interface DayChipsProps {
   value: DayChoice;
-  onChange: (key: "day", value: DayChoice) => void;
+  onSelect: (value: DayChoice) => void;
 }
 
-function DayChips({ value, onChange }: DayChipsProps) {
+function DayChips({ value, onSelect }: DayChipsProps) {
   return (
     <ChipScroller label="quando">
       {DAY_CHOICES.map((d) => (
-        <DayChip key={d} day={d} active={value === d} onSelect={onChange} />
+        <DayChip key={d} day={d} active={value === d} onSelect={onSelect} />
       ))}
     </ChipScroller>
   );
@@ -157,12 +135,12 @@ function DayChips({ value, onChange }: DayChipsProps) {
 interface DayChipProps {
   day: DayChoice;
   active: boolean;
-  onSelect: (key: "day", value: DayChoice) => void;
+  onSelect: (value: DayChoice) => void;
 }
 
 function DayChip({ day, active, onSelect }: DayChipProps) {
   function handleClickDayChip() {
-    onSelect("day", day);
+    onSelect(day);
   }
   return (
     <Chip variant="option" active={active} onClick={handleClickDayChip}>

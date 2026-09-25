@@ -1,25 +1,23 @@
+import { demands } from "@/db/schema";
 import type { DemandDTO } from "@/lib/demand";
-import type { DemandRow } from "@/lib/supabase/types";
 
-export const DEMAND_COLUMNS = "id, title, due, prio, requester, project_id, company, dept, status, prev_status, notes";
+/** Só as colunas que as telas usam (nada de user_id, notified_at...). */
+export const DEMAND_COLUMNS = {
+  id: demands.id,
+  title: demands.title,
+  due: demands.due,
+  prio: demands.prio,
+  requester: demands.requester,
+  projectId: demands.projectId,
+  company: demands.company,
+  dept: demands.dept,
+  status: demands.status,
+  prevStatus: demands.prevStatus,
+  notes: demands.notes,
+};
 
-export type DemandColumns = Pick<
-  DemandRow,
-  "id" | "title" | "due" | "prio" | "requester" | "project_id" | "company" | "dept" | "status" | "prev_status" | "notes"
->;
+export type DemandRow = Omit<DemandDTO, "due"> & { due: Date };
 
-export function mapDemand(row: DemandColumns): DemandDTO {
-  return {
-    id: row.id,
-    title: row.title,
-    due: Date.parse(row.due),
-    prio: row.prio,
-    requester: row.requester,
-    projectId: row.project_id,
-    company: row.company,
-    dept: row.dept,
-    status: row.status,
-    prevStatus: row.prev_status,
-    notes: row.notes,
-  };
+export function mapDemand(row: DemandRow): DemandDTO {
+  return { ...row, due: row.due.getTime() };
 }

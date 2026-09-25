@@ -1,12 +1,13 @@
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
+import { count, eq } from "drizzle-orm";
+import { db } from "@/db";
+import { projects } from "@/db/schema";
 import { PROJECT_COLORS } from "@/lib/constants";
+import { getCurrentUser } from "../authService/getCurrentUser";
 
+/** A cor segue a rotação da paleta de projetos. */
 export async function postProject(name: string) {
-  const supabase = await createClient();
-  const { count, error: countError } = await supabase.from("projects").select("id", { count: "exact", head: true });
-  if (countError) throw countError;
-  const color = PROJECT_COLORS[(count ?? 0) % PROJECT_COLORS.length];
-  const { error } = await supabase.from("projects").insert({ name, color });
-  if (error) throw error;
+  const { id: userId } = await getCurrentUser();
+  const [{ total }] = await db.select({ total: count() }).from(projects).where(eq(projects.userId, userId));
+  await db.insert(projects).values({ userId, name, color: PROJECT_COLORS[total % PROJECT_COLORS.length] });
 }

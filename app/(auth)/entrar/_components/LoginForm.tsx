@@ -1,10 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState, useTransition, type ChangeEvent, type MouseEvent } from "react";
-import { forgotPassword, login, type AuthState } from "@/actions/authActions";
+import { useState, useTransition, type MouseEvent } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { forgotPassword, login } from "@/actions/authActions";
 import { useToast } from "@/contexts/ToastContext";
-import { AuthInput, FormMessage, PasswordInput, authTitleClass, submitClass } from "../../_components/AuthInput";
+import { loginSchema, type LoginInput } from "@/lib/schemas";
+import {
+  AuthInput,
+  FormMessage,
+  PasswordInput,
+  authTitleClass,
+  firstFormError,
+  submitClass,
+} from "../../_components/AuthInput";
 
 interface LoginFormProps {
   expiredLink?: boolean;
@@ -12,47 +22,37 @@ interface LoginFormProps {
 
 export function LoginForm({ expiredLink = false }: LoginFormProps) {
   const toast = useToast();
-  const [state, action, pending] = useActionState<AuthState, FormData>(login, {
-    error: expiredLink ? "esse link expirou. pede outro?" : "",
-  });
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [, startTransition] = useTransition();
+  const [notice, setNotice] = useState(expiredLink ? "esse link expirou. pede outro?" : "");
+  const {
+    register,
+    handleSubmit,
+    getValues,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginInput>({ resolver: zodResolver(loginSchema), defaultValues: { email: "", password: "" } });
 
-  function handleChangeEmailInput(e: ChangeEvent<HTMLInputElement>) {
-    setEmail(e.target.value);
+  async function handleSubmitForm(values: LoginInput) {
+    setNotice("");
+    const result = await login(values);
+    if (result.error) setError("root", { message: result.error });
   }
-  function handleChangePasswordInput(e: ChangeEvent<HTMLInputElement>) {
-    setPassword(e.target.value);
-  }
+
   function handleClickForgotLink(e: MouseEvent) {
     e.preventDefault();
     startTransition(async () => {
-      const result = await forgotPassword(email);
+      const result = await forgotPassword(getValues("email"));
       toast(result.error || result.info || "");
     });
   }
 
   return (
-    <form action={action} className="flex flex-col gap-3.5">
+    <form noValidate onSubmit={handleSubmit(handleSubmitForm)} className="flex flex-col gap-3.5">
       <h2 className={authTitleClass}>entra aí.</h2>
-      <AuthInput
-        label="e-mail"
-        name="email"
-        type="email"
-        autoComplete="email"
-        value={email}
-        onChange={handleChangeEmailInput}
-      />
-      <PasswordInput
-        label="senha"
-        name="password"
-        autoComplete="current-password"
-        value={password}
-        onChange={handleChangePasswordInput}
-      />
-      <FormMessage error={state.error} info={state.info} />
-      <button type="submit" disabled={pending} className={submitClass}>
+      <AuthInput label="e-mail" type="email" autoComplete="email" {...register("email")} />
+      <PasswordInput label="senha" autoComplete="current-password" {...register("password")} />
+      <FormMessage error={firstFormError(errors) || notice} />
+      <button type="submit" disabled={isSubmitting} className={submitClass}>
         entrar
       </button>
       <div className="mt-1 flex items-center justify-between text-[13px]">

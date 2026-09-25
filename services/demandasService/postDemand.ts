@@ -1,6 +1,9 @@
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
+import { db } from "@/db";
+import { demands } from "@/db/schema";
 import type { Company, Dept, Prio } from "@/lib/constants";
+import { getCurrentUser } from "../authService/getCurrentUser";
+import { assertProjectOwner } from "./assertProjectOwner";
 
 export interface NewDemand {
   title: string;
@@ -13,20 +16,11 @@ export interface NewDemand {
 }
 
 export async function postDemand(input: NewDemand) {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("demands")
-    .insert({
-      title: input.title,
-      due: new Date(input.due).toISOString(),
-      prio: input.prio,
-      requester: input.requester,
-      project_id: input.projectId,
-      company: input.company,
-      dept: input.dept,
-    })
-    .select("id")
-    .single();
-  if (error) throw error;
-  return data.id;
+  const { id: userId } = await getCurrentUser();
+  await assertProjectOwner(userId, input.projectId);
+  const [row] = await db
+    .insert(demands)
+    .values({ ...input, userId, due: new Date(input.due) })
+    .returning({ id: demands.id });
+  return row.id;
 }

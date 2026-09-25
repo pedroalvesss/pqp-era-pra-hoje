@@ -1,7 +1,10 @@
 import "server-only";
 import { cache } from "react";
-import { createClient } from "@/lib/supabase/server";
-import { DEFAULT_TZ, type Lead } from "@/lib/constants";
+import { redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { users } from "@/db/schema";
+import type { Lead } from "@/lib/constants";
 import { getCurrentUser } from "../authService/getCurrentUser";
 
 export interface ProfileDTO {
@@ -14,20 +17,19 @@ export interface ProfileDTO {
 }
 
 export const getProfile = cache(async (): Promise<ProfileDTO> => {
-  const user = await getCurrentUser();
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("name, push_enabled, lead, workday_end, timezone")
-    .eq("id", user.id)
-    .single();
-  if (error) throw error;
-  return {
-    name: data.name || user.email.split("@")[0],
-    email: user.email,
-    pushEnabled: data.push_enabled,
-    lead: data.lead,
-    workdayEnd: data.workday_end.slice(0, 5),
-    timezone: data.timezone || DEFAULT_TZ,
-  };
+  const { id } = await getCurrentUser();
+  const [user] = await db
+    .select({
+      name: users.name,
+      email: users.email,
+      pushEnabled: users.pushEnabled,
+      lead: users.lead,
+      workdayEnd: users.workdayEnd,
+      timezone: users.timezone,
+    })
+    .from(users)
+    .where(eq(users.id, id));
+  // JWT válido de uma conta que não existe mais: derruba a sessão
+  if (!user) redirect("/sair");
+  return { ...user, workdayEnd: user.workdayEnd.slice(0, 5) };
 });

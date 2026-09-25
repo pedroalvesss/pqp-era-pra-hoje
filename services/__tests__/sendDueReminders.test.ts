@@ -1,84 +1,82 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { callOf, fakeSupabase } from "@/test/supabaseMock";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { eq } from "drizzle-orm";
+import { createTestDb, resetDb, seedUser, type TestDb } from "@/test/db";
 import { NOW } from "@/test/fixtures";
+import { demands, notifications, pushSubscriptions, users } from "@/db/schema";
 
-const supa = vi.hoisted(() => ({ current: null as unknown }));
+const ctx = vi.hoisted(() => ({ db: null as unknown }));
 const push = vi.hoisted(() => ({ sendNotification: vi.fn(), setVapidDetails: vi.fn() }));
-vi.mock("@/lib/supabase/server", () => ({ createAdminClient: () => supa.current, env: (n: string) => n }));
+vi.mock("@/db", () => ({
+  get db() {
+    return ctx.db;
+  },
+}));
+vi.mock("@/lib/env", () => ({ env: (n: string) => n }));
 vi.mock("web-push", () => ({ default: push }));
 
 import { sendDueReminders } from "../pushService/sendDueReminders";
 
-const iso = (ms: number) => new Date(ms).toISOString();
-const due = { id: "d1", user_id: "u1", title: "Enviar proposta", due: iso(NOW + 50 * 60000) };
-const sub = { endpoint: "https://push/1", user_id: "u1", p256dh: "k", auth: "a" };
+let db: TestDb;
+let userId: string;
+
+async function addDemand(minutesLeft: number, patch = {}) {
+  const [row] = await db
+    .insert(demands)
+    .values({ userId, title: "Enviar proposta", due: new Date(NOW + minutesLeft * 60000), ...patch })
+    .returning({ id: demands.id });
+  return row.id;
+}
+
+async function addDevice(endpoint = "https://push/1") {
+  await db.insert(pushSubscriptions).values({ endpoint, userId, p256dh: "k", auth: "a" });
+}
 
 describe("sendDueReminders", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeAll(async () => {
+    db = await createTestDb();
+    ctx.db = db;
+  }, 60000);
 
-  it("avisa, registra e envia pra cada aparelho", async () => {
-    const { client, queries } = fakeSupabase([
-      { data: [due] },
-      { data: [{ id: "u1", lead: "1h", push_enabled: true }] },
-      { data: [sub, { ...sub, endpoint: "https://push/2" }] },
-      {},
-      {},
-    ]);
-    supa.current = client;
-    expect(await sendDueReminders(NOW)).toEqual({ sent: 2 });
-    expect(callOf(queries[3], "update")?.[0]).toEqual({ notified_at: iso(NOW) });
-    expect(callOf(queries[4], "insert")?.[0]).toMatchObject({
-      demand_id: "d1",
-      text: expect.stringContaining("Faltam 50 min"),
-    });
-    expect(JSON.parse(push.sendNotification.mock.calls[0][1])).toMatchObject({ url: "/d/d1" });
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    await resetDb(db);
+    userId = await seedUser(db);
   });
 
-  it("fora da antecedência não faz nada", async () => {
-    const { client, queries } = fakeSupabase([
-      { data: [due] },
-      { data: [{ id: "u1", lead: "15m", push_enabled: true }] },
-      { data: [sub] },
-    ]);
-    supa.current = client;
+  it("avisa uma vez, grava o aviso e manda pra cada aparelho", async () => {
+    const id = await addDemand(50);
+    await addDevice("https://push/1");
+    await addDevice("https://push/2");
+    expect(await sendDueReminders(NOW)).toEqual({ sent: 2 });
+    expect(JSON.parse(push.sendNotification.mock.calls[0][1])).toMatchObject({ url: `/d/${id}` });
+    const [n] = await db.select().from(notifications);
+    expect(n.text).toContain("Faltam 50 min");
     expect(await sendDueReminders(NOW)).toEqual({ sent: 0 });
-    expect(queries).toHaveLength(3);
+  });
+
+  it("respeita a antecedência do usuário e ignora feitas", async () => {
+    await addDemand(120);
+    await addDemand(30, { status: "done" });
+    expect(await sendDueReminders(NOW)).toEqual({ sent: 0 });
+    await db.update(users).set({ lead: "1d" });
+    await addDevice();
+    expect(await sendDueReminders(NOW)).toEqual({ sent: 1 });
   });
 
   it("push desligado ainda gera o aviso no app", async () => {
-    const { client, queries } = fakeSupabase([
-      { data: [due] },
-      { data: [{ id: "u1", lead: "1h", push_enabled: false }] },
-      { data: [sub] },
-      {},
-      {},
-    ]);
-    supa.current = client;
+    await db.update(users).set({ pushEnabled: false });
+    await addDemand(10);
+    await addDevice();
     await sendDueReminders(NOW);
-    expect(queries[4].table).toBe("notifications");
     expect(push.sendNotification).not.toHaveBeenCalled();
+    expect(await db.select().from(notifications)).toHaveLength(1);
   });
 
   it("assinatura morta (410) é apagada", async () => {
     push.sendNotification.mockRejectedValueOnce({ statusCode: 410 });
-    const { client, queries } = fakeSupabase([
-      { data: [due] },
-      { data: [{ id: "u1", lead: "1h", push_enabled: true }] },
-      { data: [sub] },
-      {},
-      {},
-      {},
-    ]);
-    supa.current = client;
+    await addDemand(10);
+    await addDevice();
     await sendDueReminders(NOW);
-    expect(queries[5].table).toBe("push_subscriptions");
-    expect(callOf(queries[5], "eq")).toEqual(["endpoint", sub.endpoint]);
-  });
-
-  it("sem demandas pendentes sai cedo", async () => {
-    const { client, queries } = fakeSupabase([{ data: [] }]);
-    supa.current = client;
-    expect(await sendDueReminders(NOW)).toEqual({ sent: 0 });
-    expect(queries).toHaveLength(1);
+    expect(await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId))).toHaveLength(0);
   });
 });

@@ -6,17 +6,34 @@ const email = z.email("esse e-mail tá estranho.");
 const password = z.string().min(6, "senha com pelo menos 6 caracteres.");
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "hora inválida.");
 
-export const loginSchema = z.object({ email, password });
+const samePasswords: [(v: { password: string; password2: string }) => boolean, { message: string; path: string[] }] = [
+  (v) => v.password === v.password2,
+  { message: "as senhas não bateram.", path: ["password2"] },
+];
 
-export const registerSchema = z
-  .object({
-    name: z.string().trim().min(1, "fala seu nome, pelo menos.").max(60),
-    email,
-    password,
-    password2: z.string(),
-    timezone: z.string().refine(isValidTimeZone).catch("America/Sao_Paulo"),
-  })
-  .refine((v) => v.password === v.password2, { message: "as senhas não bateram.", path: ["password2"] });
+export const loginSchema = z.object({ email, password });
+export type LoginInput = z.infer<typeof loginSchema>;
+
+export const forgotPasswordSchema = z.object({ email });
+
+const registerFields = z.object({
+  name: z.string().trim().min(1, "fala seu nome, pelo menos.").max(60),
+  email,
+  password,
+  password2: z.string(),
+});
+
+/** O que o formulário valida. */
+export const registerFormSchema = registerFields.refine(...samePasswords);
+export type RegisterInput = z.infer<typeof registerFormSchema>;
+
+/** O que a action valida: o form + o fuso do aparelho. */
+export const registerSchema = registerFields
+  .extend({ timezone: z.string().refine(isValidTimeZone).catch("America/Sao_Paulo") })
+  .refine(...samePasswords);
+
+export const resetPasswordSchema = z.object({ password, password2: z.string() }).refine(...samePasswords);
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
 const optionalProject = z.uuid().nullable();
 
@@ -65,7 +82,7 @@ export const demandSnapshotSchema = z.object({
   notes: z.string().max(5000),
 });
 
-export const projectSchema = z.object({ name: z.string().trim().min(1).max(60) });
+export const projectSchema = z.object({ name: z.string().trim().min(1, "dá um nome, né.").max(60) });
 
 export const prefsSchema = z.object({ pushEnabled: z.boolean(), lead: z.enum(LEADS), workdayEnd: time }).partial();
 export type PrefsInput = z.infer<typeof prefsSchema>;

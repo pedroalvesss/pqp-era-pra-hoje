@@ -1,37 +1,38 @@
 "use client";
 
-import { useActionState, useState, type ChangeEvent } from "react";
-import { updatePassword, type AuthState } from "@/actions/authActions";
-import { FormMessage, PasswordInput, authTitleClass, submitClass } from "../../_components/AuthInput";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { updatePassword } from "@/actions/authActions";
+import { resetPasswordSchema, type ResetPasswordInput } from "@/lib/schemas";
+import { FormMessage, PasswordInput, authTitleClass, firstFormError, submitClass } from "../../_components/AuthInput";
 
-export function ResetPasswordForm() {
-  const [state, action, pending] = useActionState<AuthState, FormData>(updatePassword, { error: "" });
-  const [values, setValues] = useState({ password: "", password2: "" });
+interface ResetPasswordFormProps {
+  token: string;
+}
 
-  function handleChangeInput(e: ChangeEvent<HTMLInputElement>) {
-    const { name, value } = e.target;
-    setValues((v) => ({ ...v, [name]: value }));
+export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<ResetPasswordInput>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: { password: "", password2: "" },
+  });
+
+  async function handleSubmitForm(values: ResetPasswordInput) {
+    const result = await updatePassword(token, values);
+    if (result.error) setError("root", { message: result.error });
   }
 
   return (
-    <form action={action} className="flex flex-col gap-3.5">
+    <form noValidate onSubmit={handleSubmit(handleSubmitForm)} className="flex flex-col gap-3.5">
       <h2 className={authTitleClass}>senha nova.</h2>
-      <PasswordInput
-        label="senha (6+ caracteres)"
-        name="password"
-        autoComplete="new-password"
-        value={values.password}
-        onChange={handleChangeInput}
-      />
-      <PasswordInput
-        label="repete a senha"
-        name="password2"
-        autoComplete="new-password"
-        value={values.password2}
-        onChange={handleChangeInput}
-      />
-      <FormMessage error={state.error} />
-      <button type="submit" disabled={pending} className={submitClass}>
+      <PasswordInput label="senha (6+ caracteres)" autoComplete="new-password" {...register("password")} />
+      <PasswordInput label="repete a senha" autoComplete="new-password" {...register("password2")} />
+      <FormMessage error={firstFormError(errors)} />
+      <button type="submit" disabled={isSubmitting} className={submitClass}>
         salvar
       </button>
     </form>

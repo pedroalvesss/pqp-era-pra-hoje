@@ -1,70 +1,74 @@
 "use server";
 
+import { AuthError } from "next-auth";
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { firstError, loginSchema, registerSchema } from "@/lib/schemas";
-import { z } from "zod";
+import { signIn, signOut } from "@/auth";
+import { sendResetEmail } from "@/lib/mailer";
+import {
+  firstError,
+  forgotPasswordSchema,
+  loginSchema,
+  registerSchema,
+  resetPasswordSchema,
+  type LoginInput,
+  type RegisterInput,
+  type ResetPasswordInput,
+} from "@/lib/schemas";
+import { patchUserPasswordByResetToken } from "@/services/usuariosService/patchUserPasswordByResetToken";
+import { postPasswordResetToken } from "@/services/usuariosService/postPasswordResetToken";
+import { postUser } from "@/services/usuariosService/postUser";
 
 export interface AuthState {
   error: string;
   info?: string;
 }
 
-async function origin() {
-  const h = await headers();
-  return `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}`;
+/** Em sucesso o signIn lança o redirect do Next; só erro de credencial vira mensagem. */
+async function signInOrError(email: string, password: string, redirectTo: string): Promise<AuthState> {
+  try {
+    await signIn("credentials", { email, password, redirectTo });
+  } catch (e) {
+    if (e instanceof AuthError) return { error: "e-mail ou senha errados." };
+    throw e;
+  }
+  return { error: "" };
 }
 
-export async function login(_: AuthState, form: FormData): Promise<AuthState> {
-  const parsed = loginSchema.safeParse(Object.fromEntries(form));
+export async function login(input: LoginInput): Promise<AuthState> {
+  const parsed = loginSchema.safeParse(input);
   if (!parsed.success) return { error: firstError(parsed.error) };
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error) return { error: "e-mail ou senha errados." };
-  redirect("/");
+  return signInOrError(parsed.data.email, parsed.data.password, "/");
 }
 
-export async function register(_: AuthState, form: FormData): Promise<AuthState> {
-  const parsed = registerSchema.safeParse(Object.fromEntries(form));
+export async function register(input: RegisterInput & { timezone: string }): Promise<AuthState> {
+  const parsed = registerSchema.safeParse(input);
   if (!parsed.success) return { error: firstError(parsed.error) };
   const { name, email, password, timezone } = parsed.data;
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: { data: { name, timezone }, emailRedirectTo: `${await origin()}/auth/confirm` },
-  });
-  if (error) return { error: "não rolou criar a conta. esse e-mail já existe?" };
-  if (!data.session) return { error: "", info: "confere teu e-mail pra confirmar a conta." };
-  redirect("/?novo=1");
+  if (!(await postUser({ name, email, password, timezone }))) return { error: "esse e-mail já tem conta. entra?" };
+  return signInOrError(email, password, "/?novo=1");
 }
 
 export async function forgotPassword(email: string): Promise<AuthState> {
-  const parsed = z.email().safeParse(email);
-  if (!parsed.success) return { error: "esse e-mail tá estranho." };
-  const supabase = await createClient();
+  const parsed = forgotPasswordSchema.safeParse({ email });
+  if (!parsed.success) return { error: firstError(parsed.error) };
+  const reset = await postPasswordResetToken(parsed.data.email);
+  if (reset) {
+    const h = await headers();
+    const origin = `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}`;
+    await sendResetEmail(reset.email, `${origin}/redefinir-senha?token=${reset.token}`);
+  }
   // mesma resposta exista ou não a conta, pra não entregar quem tem cadastro
-  await supabase.auth.resetPasswordForEmail(parsed.data, {
-    redirectTo: `${await origin()}/auth/confirm?next=/redefinir-senha`,
-  });
   return { error: "", info: "relaxa, mandamos um link pro seu e-mail." };
 }
 
-export async function updatePassword(_: AuthState, form: FormData): Promise<AuthState> {
-  const parsed = z
-    .object({ password: z.string().min(6, "senha com pelo menos 6 caracteres."), password2: z.string() })
-    .refine((v) => v.password === v.password2, { message: "as senhas não bateram." })
-    .safeParse(Object.fromEntries(form));
+export async function updatePassword(token: string, input: ResetPasswordInput): Promise<AuthState> {
+  const parsed = resetPasswordSchema.safeParse(input);
   if (!parsed.success) return { error: firstError(parsed.error) };
-  const supabase = await createClient();
-  const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
-  if (error) return { error: "não rolou trocar a senha. pede outro link?" };
-  redirect("/");
+  const email = await patchUserPasswordByResetToken(token, parsed.data.password);
+  if (!email) return { error: "esse link expirou. pede outro?" };
+  return signInOrError(email, parsed.data.password, "/");
 }
 
 export async function logout() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
-  redirect("/entrar");
+  await signOut({ redirectTo: "/entrar" });
 }

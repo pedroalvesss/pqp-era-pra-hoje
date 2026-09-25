@@ -1,5 +1,8 @@
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
+import { desc, eq } from "drizzle-orm";
+import { db } from "@/db";
+import { notifications } from "@/db/schema";
+import { getCurrentUser } from "../authService/getCurrentUser";
 
 export interface NotificationDTO {
   id: string;
@@ -10,18 +13,18 @@ export interface NotificationDTO {
 }
 
 export async function getNotifications(): Promise<NotificationDTO[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("notifications")
-    .select("id, demand_id, text, created_at, read_at")
-    .order("created_at", { ascending: false })
+  const { id } = await getCurrentUser();
+  const rows = await db
+    .select({
+      id: notifications.id,
+      demandId: notifications.demandId,
+      text: notifications.text,
+      createdAt: notifications.createdAt,
+      readAt: notifications.readAt,
+    })
+    .from(notifications)
+    .where(eq(notifications.userId, id))
+    .orderBy(desc(notifications.createdAt))
     .limit(100);
-  if (error) throw error;
-  return data.map((n) => ({
-    id: n.id,
-    demandId: n.demand_id,
-    text: n.text,
-    createdAt: Date.parse(n.created_at),
-    unread: !n.read_at,
-  }));
+  return rows.map(({ readAt, createdAt, ...n }) => ({ ...n, createdAt: createdAt.getTime(), unread: !readAt }));
 }

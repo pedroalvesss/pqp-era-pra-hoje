@@ -1,11 +1,16 @@
 import "server-only";
 import { cache } from "react";
-import { createClient } from "@/lib/supabase/server";
+import { asc, eq } from "drizzle-orm";
+import { db } from "@/db";
+import { projects } from "@/db/schema";
 import type { ProjectDTO } from "@/lib/demand";
+import { getCurrentUser } from "../authService/getCurrentUser";
 
 export const getProjects = cache(async (): Promise<ProjectDTO[]> => {
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("projects").select("id, name, color").order("created_at");
-  if (error) throw error;
-  return data;
+  const { id } = await getCurrentUser();
+  return db
+    .select({ id: projects.id, name: projects.name, color: projects.color })
+    .from(projects)
+    .where(eq(projects.userId, id))
+    .orderBy(asc(projects.createdAt));
 });

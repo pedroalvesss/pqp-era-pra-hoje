@@ -7,9 +7,9 @@ import { ToastProvider } from "@/contexts/ToastContext";
 vi.mock("next/link", async () => (await import("@/test/nextMocks")).linkMock);
 const auth = vi.hoisted(() => ({
   login: vi.fn(async () => ({ error: "e-mail ou senha errados." })),
-  register: vi.fn(async (_: unknown, form: FormData) => ({ error: "", info: String(form.get("timezone")) })),
+  register: vi.fn(async () => ({ error: "esse e-mail já tem conta. entra?" })),
   forgotPassword: vi.fn(async () => ({ error: "", info: "relaxa, mandamos um link pro seu e-mail." })),
-  updatePassword: vi.fn(async () => ({ error: "as senhas não bateram." })),
+  updatePassword: vi.fn(async () => ({ error: "esse link expirou. pede outro?" })),
 }));
 vi.mock("@/actions/authActions", () => auth);
 
@@ -28,6 +28,15 @@ describe("LoginForm", () => {
     await userEvent.click(screen.getByRole("button", { name: "entrar" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("e-mail ou senha errados.");
     expect(screen.getByLabelText("e-mail")).toHaveValue("pedro@x.com");
+    expect(auth.login).toHaveBeenCalledWith({ email: "pedro@x.com", password: "123456" });
+  });
+
+  it("valida no client antes de ir pro servidor", async () => {
+    render(<LoginForm />);
+    await userEvent.type(screen.getByLabelText("e-mail"), "pedro");
+    await userEvent.click(screen.getByRole("button", { name: "entrar" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("esse e-mail tá estranho.");
+    expect(auth.login).not.toHaveBeenCalled();
   });
 
   it("mostrar senha", async () => {
@@ -54,17 +63,42 @@ describe("LoginForm", () => {
   });
 });
 
-it("RegisterForm manda o fuso do aparelho", async () => {
-  render(<RegisterForm />);
-  await userEvent.click(screen.getByRole("button", { name: "criar conta" }));
-  await waitFor(() => expect(auth.register).toHaveBeenCalled());
-  expect(await screen.findByRole("status")).toHaveTextContent(Intl.DateTimeFormat().resolvedOptions().timeZone);
+describe("RegisterForm", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  async function fill(password2 = "123456") {
+    render(<RegisterForm />);
+    await userEvent.type(screen.getByLabelText("como te chamam?"), "Pedro");
+    await userEvent.type(screen.getByLabelText("e-mail"), "pedro@x.com");
+    await userEvent.type(screen.getByLabelText("senha (6+ caracteres)"), "123456");
+    await userEvent.type(screen.getByLabelText("repete a senha"), password2);
+    await userEvent.click(screen.getByRole("button", { name: "criar conta" }));
+  }
+
+  it("senhas diferentes nem chegam no servidor", async () => {
+    await fill("654321");
+    expect(await screen.findByRole("alert")).toHaveTextContent("as senhas não bateram.");
+    expect(auth.register).not.toHaveBeenCalled();
+  });
+
+  it("manda o fuso do aparelho e mostra o erro do servidor", async () => {
+    await fill();
+    await waitFor(() =>
+      expect(auth.register).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Pedro", timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }),
+      ),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("esse e-mail já tem conta. entra?");
+  });
 });
 
-it("ResetPasswordForm mostra o erro", async () => {
-  render(<ResetPasswordForm />);
+it("ResetPasswordForm manda o token junto", async () => {
+  render(<ResetPasswordForm token="t0k3n" />);
+  await userEvent.type(screen.getByLabelText("senha (6+ caracteres)"), "123456");
+  await userEvent.type(screen.getByLabelText("repete a senha"), "123456");
   await userEvent.click(screen.getByRole("button", { name: "salvar" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("as senhas não bateram.");
+  expect(await screen.findByRole("alert")).toHaveTextContent("esse link expirou. pede outro?");
+  expect(auth.updatePassword).toHaveBeenCalledWith("t0k3n", { password: "123456", password2: "123456" });
 });
 
 it("AuthHero traz a folhinha e a frase", () => {

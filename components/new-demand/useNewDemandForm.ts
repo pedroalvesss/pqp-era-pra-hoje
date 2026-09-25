@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useForm, useWatch, type PathValue } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { createDemand, deleteDemand } from "@/actions/demandActions";
 import type { ProjectDTO } from "@/lib/demand";
-import type { CreateDemandInput } from "@/lib/schemas";
+import { createDemandSchema, type CreateDemandInput } from "@/lib/schemas";
 import { useToast } from "@/contexts/ToastContext";
 
 export function blankForm(workdayEnd: string, projects: ProjectDTO[]): CreateDemandInput {
@@ -21,24 +22,25 @@ export function blankForm(workdayEnd: string, projects: ProjectDTO[]): CreateDem
 
 export function useNewDemandForm(workdayEnd: string, projects: ProjectDTO[], onDone: () => void) {
   const toast = useToast();
-  const [form, setForm] = useState(() => blankForm(workdayEnd, projects));
-  const [error, setError] = useState("");
-  const [pending, startTransition] = useTransition();
+  const form = useForm<CreateDemandInput>({
+    resolver: zodResolver(createDemandSchema),
+    defaultValues: blankForm(workdayEnd, projects),
+  });
+  const values = useWatch({ control: form.control });
 
-  function set<K extends keyof CreateDemandInput>(key: K, value: CreateDemandInput[K]) {
-    setForm((f) => ({ ...f, [key]: value }));
-    if (key === "title") setError("");
+  // os chips não são inputs nativos: gravam direto no form
+  function pick<K extends keyof CreateDemandInput>(key: K, value: CreateDemandInput[K]) {
+    form.setValue(key, value as PathValue<CreateDemandInput, K>, { shouldDirty: true });
   }
 
-  function submit() {
-    if (!form.title.trim()) return setError("escreve pelo menos o que é, né.");
-    startTransition(async () => {
-      const result = await createDemand(form);
-      if (!result.ok) return setError(result.error);
-      onDone();
-      toast("anotado. agora não tem desculpa.", () => void deleteDemand(result.id));
-    });
-  }
+  const submit = form.handleSubmit(async (data) => {
+    const result = await createDemand(data);
+    if (!result.ok) return form.setError("root", { message: result.error });
+    onDone();
+    toast("anotado. agora não tem desculpa.", () => void deleteDemand(result.id));
+  });
 
-  return { form, set, error, pending, submit };
+  const error = form.formState.errors.title?.message ?? form.formState.errors.root?.message ?? "";
+
+  return { form, values: values as CreateDemandInput, pick, submit, error };
 }

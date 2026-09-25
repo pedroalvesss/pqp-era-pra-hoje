@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { auth } from "@/auth";
 
 export interface CurrentUser {
   id: string;
@@ -9,8 +9,7 @@ export interface CurrentUser {
 }
 
 export const getCurrentUser = cache(async (): Promise<CurrentUser> => {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getClaims();
-  if (!data?.claims) redirect("/entrar");
-  return { id: data.claims.sub, email: String(data.claims.email ?? "") };
+  const session = await auth();
+  if (!session?.user?.id) redirect("/entrar");
+  return { id: session.user.id, email: session.user.email ?? "" };
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ChangeEvent } from "react";
+import type { KeyboardEvent } from "react";
 import { CaretLeftIcon, TrashIcon, XIcon } from "@phosphor-icons/react";
 import { STATUSES, STATUS_LABEL, type Status } from "@/lib/constants";
 import { plusOneDay } from "@/lib/dates";
@@ -19,18 +19,18 @@ export interface DemandDetailProps {
 
 export function DemandDetail({ demand, projects, onClose }: DemandDetailProps) {
   const { now, tz } = useNow();
-  const { draft, setDraft, setText, setField, flush, actions } = useDemandDraft(demand);
+  const { draft, registerText, setLocal, setField, flush, actions } = useDemandDraft(demand);
   const when = describeWhen(draft, now, tz);
   const done = draft.status === "done";
 
-  function handleChangeTitleInput(e: ChangeEvent<HTMLTextAreaElement>) {
-    setText("title", e.target.value.replace(/\n/g, " "));
-  }
-  function handleChangeNotesInput(e: ChangeEvent<HTMLTextAreaElement>) {
-    setText("notes", e.target.value);
+  // título é uma linha só: Enter só sai do campo (e salva no blur)
+  function handleKeyDownTitleInput(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    e.currentTarget.blur();
   }
   function handleSelectStatus(status: Status) {
-    setDraft((d) => ({ ...d, status }));
+    setLocal({ status });
     void actions.setStatus(draft, status);
   }
   function handleClickDeleteButton() {
@@ -40,7 +40,7 @@ export function DemandDetail({ demand, projects, onClose }: DemandDetailProps) {
   }
   function handleClickPostponeButton() {
     flush();
-    setDraft((d) => ({ ...d, due: plusOneDay(d.due, tz) }));
+    setLocal({ due: plusOneDay(draft.due, tz) });
     void actions.postpone(draft);
   }
   function handleClickDoneButton() {
@@ -64,18 +64,18 @@ export function DemandDetail({ demand, projects, onClose }: DemandDetailProps) {
           <TrashIcon />
         </button>
       </div>
-      <div className="flex flex-1 flex-col gap-[22px] overflow-auto px-6 pt-1 pb-6">
+      {/* shrink-0: sem isso o flex espreme o grupo de campos em vez de rolar */}
+      <div className="flex flex-1 flex-col gap-[22px] overflow-auto px-6 pt-1 pb-6 [&>*]:shrink-0">
         <div className="flex flex-col gap-1.5">
           <span className={`tabular text-sm font-medium ${TONE_TIME[when.tone]}`}>
             {when.top} · {when.time}
           </span>
           <textarea
             aria-label="título"
-            value={draft.title}
-            onChange={handleChangeTitleInput}
-            onBlur={flush}
             rows={2}
+            onKeyDown={handleKeyDownTitleInput}
             className="text-text w-full resize-none border-none bg-transparent p-0 text-[26px] leading-[1.15] font-medium tracking-[-0.03em] outline-none"
+            {...registerText("title")}
           />
         </div>
         <div role="group" aria-label="status" className="flex flex-wrap gap-1">
@@ -88,16 +88,13 @@ export function DemandDetail({ demand, projects, onClose }: DemandDetailProps) {
           projects={projects}
           tz={tz}
           onField={setField}
-          onText={setText}
-          onBlurText={flush}
+          requesterField={registerText("requester")}
         />
         <textarea
           aria-label="anotações"
-          value={draft.notes}
-          onChange={handleChangeNotesInput}
-          onBlur={flush}
           placeholder="anotações…"
           className="text-text min-h-[110px] resize-y border-0 border-t border-solid border-neutral-900 bg-transparent px-0 pt-3.5 pb-0 text-sm leading-normal outline-none"
+          {...registerText("notes")}
         />
       </div>
       <div className="flex gap-2 px-6 pt-3 pb-[calc(20px+env(safe-area-inset-bottom))]">

@@ -1,33 +1,32 @@
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
+import { and, eq } from "drizzle-orm";
+import { db } from "@/db";
+import { demands } from "@/db/schema";
 import type { UpdateDemandInput } from "@/lib/schemas";
-import type { DemandRow } from "@/lib/supabase/types";
 import { withoutUndefined } from "@/lib/utils";
+import { getCurrentUser } from "../authService/getCurrentUser";
+import { assertProjectOwner } from "./assertProjectOwner";
 
-export async function patchDemandById(id: string, input: UpdateDemandInput) {
-  const supabase = await createClient();
-  const patch: Partial<DemandRow> = {
-    title: input.title,
-    prio: input.prio,
-    requester: input.requester,
-    project_id: input.projectId,
-    company: input.company,
-    dept: input.dept,
-    notes: input.notes,
-  };
+type DemandPatch = Partial<typeof demands.$inferInsert>;
+
+export async function patchDemandById(demandId: string, input: UpdateDemandInput) {
+  const { id: userId } = await getCurrentUser();
+  const own = and(eq(demands.id, demandId), eq(demands.userId, userId));
+  await assertProjectOwner(userId, input.projectId);
+
+  const { due, status, ...fields } = input;
+  const patch: DemandPatch = withoutUndefined(fields);
   // prazo novo = aviso novo
-  if (input.due !== undefined) Object.assign(patch, { due: new Date(input.due).toISOString(), notified_at: null });
+  if (due !== undefined) Object.assign(patch, { due: new Date(due), notifiedAt: null });
 
-  if (input.status !== undefined) {
-    const { data: current, error } = await supabase.from("demands").select("status").eq("id", id).single();
-    if (error) throw error;
-    patch.status = input.status;
-    if (input.status === "done" && current.status !== "done") {
-      Object.assign(patch, { prev_status: current.status, done_at: new Date().toISOString() });
-    }
-    if (input.status !== "done") patch.done_at = null;
+  if (status !== undefined) {
+    const [current] = await db.select({ status: demands.status }).from(demands).where(own);
+    if (!current) throw new Error("demanda não encontrada");
+    patch.status = status;
+    if (status === "done" && current.status !== "done")
+      Object.assign(patch, { prevStatus: current.status, doneAt: new Date() });
+    if (status !== "done") patch.doneAt = null;
   }
 
-  const { error } = await supabase.from("demands").update(withoutUndefined(patch)).eq("id", id);
-  if (error) throw error;
+  if (Object.keys(patch).length) await db.update(demands).set(patch).where(own);
 }

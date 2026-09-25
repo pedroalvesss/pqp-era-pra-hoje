@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useTransition, type ChangeEvent } from "react";
+import { useTransition } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { updatePrefs } from "@/actions/profileActions";
 import { chipClass } from "@/components/Chip";
 import { LEADS, LEAD_LABEL, type Lead } from "@/lib/constants";
+import type { PrefsInput } from "@/lib/schemas";
 import { useToast } from "@/contexts/ToastContext";
 import { usePushToggle } from "../_hooks/usePushToggle";
 import { Switch } from "./Switch";
@@ -19,11 +21,12 @@ const row = "flex items-center gap-3 px-4 [&+&]:shadow-[inset_0_1px_0_var(--colo
 export function PrefsGroup({ pushEnabled, lead, workdayEnd }: PrefsGroupProps) {
   const toast = useToast();
   const push = usePushToggle(pushEnabled);
-  const [leadValue, setLead] = useState(lead);
-  const [end, setEnd] = useState(workdayEnd);
   const [, startTransition] = useTransition();
+  // cada mudança salva na hora; o form só guarda o valor atual
+  const { register, setValue, control } = useForm({ defaultValues: { lead, workdayEnd } });
+  const leadValue = useWatch({ control, name: "lead" });
 
-  function save(patch: Parameters<typeof updatePrefs>[0]) {
+  function save(patch: PrefsInput) {
     startTransition(async () => {
       const result = await updatePrefs(patch);
       if (!result.ok) toast(result.error);
@@ -31,12 +34,11 @@ export function PrefsGroup({ pushEnabled, lead, workdayEnd }: PrefsGroupProps) {
   }
 
   function handleSelectLead(l: Lead) {
-    setLead(l);
+    setValue("lead", l);
     save({ lead: l });
   }
 
-  function handleChangeEndInput(e: ChangeEvent<HTMLInputElement>) {
-    setEnd(e.target.value);
+  function handleChangeEndInput(e: { target: { value: string } }) {
     if (e.target.value) save({ workdayEnd: e.target.value });
   }
 
@@ -61,9 +63,8 @@ export function PrefsGroup({ pushEnabled, lead, workdayEnd }: PrefsGroupProps) {
         <input
           id="workday-end"
           type="time"
-          value={end}
-          onChange={handleChangeEndInput}
           className="tabular text-text border-none bg-transparent text-[15px]"
+          {...register("workdayEnd", { onChange: handleChangeEndInput })}
         />
       </div>
     </div>

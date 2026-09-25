@@ -1,6 +1,7 @@
 "use client";
 
 import type { ChangeEvent } from "react";
+import type { UseFormRegisterReturn } from "react-hook-form";
 import { COMPANIES, DEPTS, type Company, type Dept, type Prio } from "@/lib/constants";
 import { isoDate, hm, withDate, withTime } from "@/lib/dates";
 import type { DemandDTO, ProjectDTO } from "@/lib/demand";
@@ -14,19 +15,15 @@ interface DetailFieldsProps {
   projects: ProjectDTO[];
   tz: string;
   onField: (patch: UpdateDemandInput) => void;
-  onText: (field: "requester", value: string) => void;
-  onBlurText: () => void;
+  requesterField: UseFormRegisterReturn<"requester">;
 }
 
-export function DetailFields({ draft, projects, tz, onField, onText, onBlurText }: DetailFieldsProps) {
+export function DetailFields({ draft, projects, tz, onField, requesterField }: DetailFieldsProps) {
   function handleChangeDateInput(e: ChangeEvent<HTMLInputElement>) {
     if (e.target.value) onField({ due: withDate(draft.due, e.target.value, tz) });
   }
   function handleChangeTimeInput(e: ChangeEvent<HTMLInputElement>) {
     if (e.target.value) onField({ due: withTime(draft.due, e.target.value, tz) });
-  }
-  function handleChangeRequesterInput(e: ChangeEvent<HTMLInputElement>) {
-    onText("requester", e.target.value);
   }
   function handleChangePrio(prio: Prio) {
     onField({ prio });
@@ -63,14 +60,7 @@ export function DetailFields({ draft, projects, tz, onField, onText, onBlurText 
         <PrioPicker value={draft.prio} onChange={handleChangePrio} />
       </FormRow>
       <FormRow label="quem pediu" htmlFor="dd-req">
-        <input
-          id="dd-req"
-          value={draft.requester}
-          onChange={handleChangeRequesterInput}
-          onBlur={onBlurText}
-          placeholder="ninguém?"
-          className={rowInputClass}
-        />
+        <input id="dd-req" placeholder="ninguém?" className={rowInputClass} {...requesterField} />
       </FormRow>
       <FormRow label="projeto">
         <ProjectChips projects={projects} value={draft.projectId} onChange={handleChangeProject} />

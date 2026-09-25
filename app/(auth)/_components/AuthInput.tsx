@@ -2,6 +2,7 @@
 
 import { useState, type InputHTMLAttributes } from "react";
 import { EyeIcon, EyeSlashIcon } from "@phosphor-icons/react";
+import type { FieldErrors } from "react-hook-form";
 
 type AuthInputProps = InputHTMLAttributes<HTMLInputElement> & { label: string };
 
@@ -52,6 +53,12 @@ export function FormMessage({ error, info }: FormMessageProps) {
       </p>
     );
   return null;
+}
+
+/** O design mostra um erro por vez: o primeiro campo inválido, senão o erro do servidor. */
+export function firstFormError(errors: FieldErrors) {
+  const field = Object.entries(errors).find(([key, e]) => key !== "root" && e?.message)?.[1];
+  return String(field?.message ?? errors.root?.message ?? "");
 }
 
 export const submitClass = "btn btn-primary mt-1 min-h-12 rounded-xl text-[15px]";
